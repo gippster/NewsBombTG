@@ -8,6 +8,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def cluster_entities(entities):
     vectorizer = TfidfVectorizer(stop_words=None)
     entity_names = [entity[1] for entity in entities]
@@ -16,6 +17,7 @@ def cluster_entities(entities):
     clustering = DBSCAN(eps=0.5, min_samples=2, metric="cosine").fit(X)
 
     return dict(zip([entity[0] for entity in entities], clustering.labels_))
+
 
 Session = sessionmaker(bind=engine)
 session = Session()

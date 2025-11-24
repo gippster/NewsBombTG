@@ -1,11 +1,17 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
-from database import SessionLocal, get_db
-from models import News, Entity
-
+from src.database import SessionLocal, get_db
+from src.models import News, Entity
 app = FastAPI()
 
+
+@app.get("/")
+async def root():
+    return {"message": "Hello World"}
+
 # Получение графа сущностей с привязанными к ним новостями
+
+
 @app.get("/graph")
 def get_graph(db: Session = Depends(get_db)):
     entities = db.query(Entity).all()

@@ -9,8 +9,8 @@ from entities_extractor import extract_and_save_entities
 
 session = Session(engine)
 
-def parse(link: str, from_date: datetime, to_date: datetime, channel_name: str):
 
+def parse(link: str, from_date: datetime, to_date: datetime, channel_name: str):
 
     url = convert_url(link)
     messages = get_messages_from_channel(url, from_date, to_date, channel_name)
@@ -31,6 +31,5 @@ def parse(link: str, from_date: datetime, to_date: datetime, channel_name: str):
             new_news = News(title="Новость", text=text, time=timestamp, link=link)
             session.add(new_news)
             session.commit()
-
 
     return messages

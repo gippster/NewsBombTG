@@ -1,6 +1,7 @@
 from database import SessionLocal
 from models import UserChannel
 
+
 def convert_url(url):
     url = url.strip()
 

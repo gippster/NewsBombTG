@@ -36,6 +36,7 @@ class Entity(Base):
 
     news = relationship("News", secondary=news_entity_link, back_populates="entities")
 
+
 class News(Base):
     __tablename__ = "news"
 
@@ -46,6 +47,7 @@ class News(Base):
     time = Column(BigInteger, nullable=False)
 
     entities = relationship("Entity", secondary=news_entity_link, back_populates="news")
+
 
 class UserChannel(Base):
     __tablename__ = "user_channels"

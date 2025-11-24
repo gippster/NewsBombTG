@@ -34,11 +34,16 @@ node_trace = go.Scatter(
     marker=dict(size=10, color="blue")
 )
 
+
 for node in G.nodes():
-    x, y = pos[node]
-    node_trace["x"] += (x,)
-    node_trace["y"] += (y,)
-    node_trace["text"] += (G.nodes[node]["label"],)
+    try:
+        x, y = pos[node]
+        node_trace["x"] += (x,)
+        node_trace["y"] += (y,)
+        node_trace["text"] += (G.nodes[node]["label"],)
+    except:
+        print(f'no label at node {node}')
+
 
 # Интерфейс Dash
 app.layout = html.Div([

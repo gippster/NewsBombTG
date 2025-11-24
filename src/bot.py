@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from models import engine, User, UserChannel, Entity, news_entity_link, Digest, News
 from parser_init import parse
 from datetime import datetime
+from digest_generator import generate_digest
 import asyncio
 
 import parser_init
@@ -16,8 +17,10 @@ session = Session(engine)
 ADMIN_ID = 123456789
 is_parsing = False
 
+
 def is_admin(user_id):
     return user_id == ADMIN_ID
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -40,6 +43,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     await update.message.reply_text("Выберите действие:", reply_markup=markup)
+
 
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global is_parsing
@@ -95,6 +99,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "🛠 Админ-панель":
         await update.message.reply_text("🛠 В разработке.")
 
+
 async def get_start_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['start_date'] = update.message.text
     await update.message.reply_text("Введите дату конца (ГГГГ-ММ-ДД):")
@@ -106,13 +111,13 @@ async def get_end_date_parse(update: Update, context: ContextTypes.DEFAULT_TYPE)
         start_date = datetime.strptime(context.user_data['start_date'], '%Y-%m-%d')
         end_date = datetime.strptime(update.message.text, '%Y-%m-%d')
         favorites = context.user_data['favorites']
-
+        massages = []
         await update.message.reply_text("❗ Парсинг в процессе. Пожалуйста, подождите.")
 
         for fav in favorites:
             link = fav.channel_url
             channel_name = link.split("/")[-1]
-            parse(link, start_date, end_date, channel_name)
+            massages = parse(link, start_date, end_date, channel_name)
 
         await update.message.reply_text(f"✅ Парсинг завершен.")
     except Exception as e:
@@ -121,17 +126,34 @@ async def get_end_date_parse(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def get_end_date_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    massages = []
+    try:
+        start_date = datetime.strptime(context.user_data['start_date'], '%Y-%m-%d')
+        end_date = datetime.strptime(update.message.text, '%Y-%m-%d')
+        favorites = context.user_data['favorites']
+
+        await update.message.reply_text("❗ Парсинг в процессе. Пожалуйста, подождите.")
+
+        for fav in favorites:
+            link = fav.channel_url
+            channel_name = link.split("/")[-1]
+            massages += parse(link, start_date, end_date, channel_name)
+
+        await update.message.reply_text(f"✅ Парсинг завершен.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
     start_date = context.user_data['start_date']
     end_date = update.message.text
-    url = f"https://news-bomb-production.up.railway.app/?start_date={start_date}&end_date={end_date}"
+    url = f"http://127.0.0.1:8050/?start_date={start_date}&end_date={end_date}"
 
     await update.message.reply_text("❗ Выделение сущностей в процессе. Пожалуйста, подождите.")
 
     session = Session(engine)
-    session.query(news_entity_link).delete()
-    session.query(Entity).delete()
-    session.query(Digest).delete()
-    session.commit()
+    #session.query(news_entity_link).delete()
+    #session.query(Entity).delete()
+    #session.query(Digest).delete()
+    #session.commit()
 
     try:
         start_date = datetime.strptime(start_date, '%Y-%m-%d')
@@ -140,7 +162,7 @@ async def get_end_date_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start_timestamp = int(start_date.timestamp() * 1000)
         end_timestamp = int(end_date.timestamp() * 1000)
 
-        messages = session.query(News).filter(News.time >= start_timestamp, News.time <= end_timestamp).all()
+        messages = massages #session.query(News).filter(News.time >= start_timestamp, News.time <= end_timestamp).fe.all()
 
         if not messages:
             await update.message.reply_text("❌ Не найдено сообщений за указанный период.")
@@ -148,6 +170,16 @@ async def get_end_date_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         extract_and_save_entities(messages)
         clusterization_start()
+        entitis = session.query(Entity).all()
+        reply_m = []
+        for entity in entitis:
+            reply_m.append([KeyboardButton(entity.name), get_digest(entity.name)])
+
+        await update.message.reply_text("Выберите тему для составления дайджеста:",
+                                        reply_markup=ReplyKeyboardMarkup([
+                                            [],
+                                            [KeyboardButton("Открыть приложение", web_app=WebAppInfo(url))]
+                                        ]))
 
         await update.message.reply_text(
             f"Открываю веб-приложение с датами: {start_date.strftime('%Y-%m-%d')} по {end_date.strftime('%Y-%m-%d')}.")
@@ -162,6 +194,11 @@ async def get_end_date_web(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+def get_digest(entity):
+     digest = session.query(Digest).filter(Digest.type == entity).first()
+     return digest.type
+
+
 async def get_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
     end_date = update.message.text
     context.user_data['end_date'] = end_date
@@ -171,6 +208,7 @@ async def get_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await get_end_date_parse(update, context)  # Для парсинга
     elif context.user_data.get('action') == 'web':
         return await get_end_date_web(update, context)  # Для веб-приложения
+
 
 async def add_to_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text.strip()
@@ -190,6 +228,7 @@ async def add_to_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ Ошибка при добавлении: {e}")
     return ConversationHandler.END
 
+
 async def remove_from_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text.strip()
     try:
@@ -206,9 +245,11 @@ async def remove_from_favorites(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("❌ Пожалуйста, введите номер канала.")
     return ConversationHandler.END
 
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Действие отменено.")
     return ConversationHandler.END
+
 
 # Функции для админ-панели
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -225,20 +266,24 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     markup = ReplyKeyboardMarkup(keyboard)
     await update.message.reply_text("🛠 Админ-панель:", reply_markup=markup)
 
+
 async def view_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users = session.query(User).all()
     user_list = "\n".join([f"ID: {user.id}, Telegram: {user.telegram_id}, Username: {user.username}" for user in users])
     await update.message.reply_text(f"Все пользователи:\n{user_list}")
 
+
 async def remove_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Введите ID пользователя для удаления:")
+
 
 async def view_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     stats = "Статистика парсинга пока не доступна."
     await update.message.reply_text(stats)
 
+
 def main():
-    app = Application.builder().token("7735571468:AAFlFNzK9K68hpkafy3e_GzHpYqqzzk722U").build()
+    app = Application.builder().token("8144763637:AAEefkb_HTpHeJfnP1jXU8SYak__9JiYIik").build()
 
     conv_handler = ConversationHandler(
         entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)],
@@ -255,6 +300,7 @@ def main():
     app.add_handler(conv_handler)
 
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

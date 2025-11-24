@@ -17,6 +17,7 @@ syntax_parser = NewsSyntaxParser(emb)
 ner_tagger = NewsNERTagger(emb)
 session = Session(engine)
 
+
 def extract_entities(text):
     doc = Doc(text)
     doc.segment(segmenter)
@@ -31,12 +32,14 @@ def extract_entities(text):
 
     return entities
 
+
 def extract_and_save_entities(messages):
     topics_to_news = {}
 
     for message in messages:
-        text = message.text  # Используем точечную нотацию
-        link = message.link  # Используем точечную нотацию
+        print(message)
+        text = message['text']
+        link = message['link']
         print(link)
         print(f"\n📌 Обрабатываем новость: {text[:100]}...")
 
